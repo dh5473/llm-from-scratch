@@ -14,6 +14,8 @@ def explore_special_tokens():
 
     # 토크나이저 로드
     tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
 
     # 기본 스페셜 토큰 분석
     print("\n📋 기본 스페셜 토큰:")
@@ -35,7 +37,14 @@ def explore_special_tokens():
     # 스페셜 토큰 ID 출력
     tokens_info = []
     for name, token in special_tokens.items():
-        token_id = tokenizer.convert_tokens_to_ids(token) if token != "없음" else "없음"
+        if token != "없음" and token is not None:
+            try:
+                token_id = tokenizer.convert_tokens_to_ids([token])[0]
+            except:
+                token_id = "변환 불가"
+        else:
+            token_id = "없음"
+
         print(f"  - {name}: '{token}' (ID: {token_id})")
         tokens_info.append({"토큰 유형": name, "토큰": token, "토큰 ID": token_id})
 

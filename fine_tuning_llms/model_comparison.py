@@ -73,6 +73,7 @@ def compare_base_instruct_models():
             max_length=100,
             do_sample=True,
             temperature=0.7,
+            attention_mask=instruct_inputs["attention_mask"],
         )
         instruct_response = instruct_tokenizer.decode(
             instruct_output[0], skip_special_tokens=True
