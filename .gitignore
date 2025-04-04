@@ -1,0 +1,7 @@
+.venv
+.env
+*/results
+/logs
+/checkpoints
+/cache
+/data
