@@ -10,7 +10,7 @@ from transformers import (
     HfArgumentParser,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, TaskType
-from datasets import load_dataset
+from datasets import load_dataset, Dataset
 import argparse
 from dataclasses import dataclass, field
 from typing import Optional, List
@@ -107,19 +107,30 @@ def preprocess_data(examples, tokenizer, max_seq_length):
         )
         formatted_texts.append(formatted)
 
-    # 토큰화 진행
-    tokenized = tokenizer(
-        formatted_texts,
-        padding="max_length",
-        truncation=True,
-        max_length=max_seq_length,
-        return_tensors="pt",
+    # 데이터셋 생성
+    dataset_dict = {"text": formatted_texts}
+    dataset = Dataset.from_dict(dataset_dict)
+
+    # 토큰화 함수 정의
+    def tokenize_function(examples):
+        result = tokenizer(
+            examples["text"],
+            padding="max_length",
+            truncation=True,
+            max_length=max_seq_length,
+            return_tensors=None,  # 개별 샘플에 텐서를 적용하지 않음
+        )
+        result["labels"] = result["input_ids"].copy()
+        return result
+
+    # 데이터셋에 토큰화 함수 적용
+    tokenized_dataset = dataset.map(
+        tokenize_function,
+        batched=True,
+        remove_columns=["text"],
     )
 
-    # 언어 모델링을 위한 레이블 설정
-    tokenized["labels"] = tokenized["input_ids"].clone()
-
-    return tokenized
+    return tokenized_dataset
 
 
 def fine_tune_model(args):
@@ -218,7 +229,7 @@ def fine_tune_model(args):
         logging_steps=1,
         save_steps=100,
         save_total_limit=3,
-        fp16=not (args.load_in_8bit or args.load_in_4bit),
+        fp16=torch.cuda.is_available() and not (args.load_in_8bit or args.load_in_4bit),
         remove_unused_columns=False,
     )
 
@@ -227,6 +238,9 @@ def fine_tune_model(args):
     print(f"  - 에포크 수: {args.num_train_epochs}")
     print(f"  - 배치 크기: {args.per_device_train_batch_size}")
     print(f"  - 출력 디렉토리: {args.output_dir}")
+    print(
+        f"  - fp16 사용: {torch.cuda.is_available() and not (args.load_in_8bit or args.load_in_4bit)}"
+    )
 
     # Trainer 초기화
     print("\n🚀 Trainer 초기화 및 학습 시작...")
